@@ -22,6 +22,7 @@ using D3Sharp.Core.Accounts;
 using D3Sharp.Core.Channels;
 using D3Sharp.Core.Toons;
 using D3Sharp.Net.BNet.Packets;
+using D3Sharp.Net.Game;
 using D3Sharp.Utils;
 using D3Sharp.Utils.Helpers;
 using Google.ProtocolBuffers;
@@ -37,6 +38,8 @@ namespace D3Sharp.Net.BNet
         private int _requestCounter = 0;
 
         public Toon CurrentToon { get; set; }
+        public Channel CurrentChannel { get; set; }
+        public GameClient InGameClient { get; set; }
 
         public IConnection Connection { get; set; }
 
@@ -101,6 +104,18 @@ namespace D3Sharp.Net.BNet
             catch (Exception e)
             {
                 Logger.DebugException(e, "MapLocalObjectID()");
+            }
+        }
+
+        public void UnmapLocalObjectID(ulong localObjectId)
+        {
+            try
+            {
+                this.MappedObjects.Remove(localObjectId);
+            }
+            catch (Exception e)
+            {
+                Logger.DebugException(e, "UnmapLocalObjectID()");
             }
         }
 

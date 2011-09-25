@@ -16,8 +16,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using D3Sharp.Utils;
 using D3Sharp.Core.Helpers;
 using D3Sharp.Core.Objects;
 using D3Sharp.Net.BNet;
@@ -27,126 +29,251 @@ namespace D3Sharp.Core.Channels
 {
     public class Channel : RPCObject
     {
-        public bnet.protocol.EntityId BnetEntityID { get; private set; }
-        public bnet.protocol.channel.ChannelState State { get; private set; }
-
-        public readonly Dictionary<BNetClient, bnet.protocol.channel.Member> Members = new Dictionary<BNetClient, bnet.protocol.channel.Member>();
-
-        public Channel(BNetClient client)
+        // Reasons the client tries to remove a member
+        // TODO: Need more data to complete this
+        public enum RemoveRequestReason : uint
         {
-            this.BnetEntityID = bnet.protocol.EntityId.CreateBuilder().SetHigh((ulong)EntityIdHelper.HighIdType.ChannelId).SetLow(this.DynamicId).Build();
+            RequestedBySelf = 0x00   // Default; generally when the client quits or leaves a channel (for example, when switching toons)
+            // Kick is probably 0x01 or somesuch
+        }
 
-            var builder = bnet.protocol.channel.ChannelState.CreateBuilder()
-                .SetPrivacyLevel(bnet.protocol.channel.ChannelState.Types.PrivacyLevel.PRIVACY_LEVEL_OPEN)
-                .SetMaxMembers(8)
-                .SetMinMembers(1)
-                .SetMaxInvitations(12);
-            //.SetName("d3sharp test channel"); // NOTE: cap log doesn't set this optional field
-            this.State = builder.Build();
+        // Reasons a member was removed (sent in NotifyRemove)
+        public enum RemoveReason : uint
+        {
+            Kicked = 0x00,           // The member was kicked
+            Left = 0x01              // The member left
+        }
 
-            // add the client that requested the creation of channel to channel
-            this.AddMember(client);
+        public static RemoveReason GetRemoveReasonForRequest(RemoveRequestReason reqreason)
+        {
+            switch (reqreason)
+            {
+                case RemoveRequestReason.RequestedBySelf:
+                    return RemoveReason.Left;
+                default:
+                    Logger.Warn("No RemoveReason for given RemoveRequestReason: {0}", Enum.GetName(typeof(RemoveRequestReason), reqreason));
+                    break;
+            }
+            return RemoveReason.Left;
+        }
+
+        public bnet.protocol.EntityId BnetEntityId { get; private set; }
+        public D3.OnlineService.EntityId D3EntityId { get; private set; }
+
+        // State
+        public bnet.protocol.channel.ChannelState.Types.PrivacyLevel PrivacyLevel { get; set; }
+        public uint MaxMembers { get; set; }
+        public uint MinMembers { get; set; }
+        public uint MaxInvitations { get; set; }
+
+        public bnet.protocol.channel.ChannelState State
+        {
+            get
+            {
+                return bnet.protocol.channel.ChannelState.CreateBuilder()
+                    .SetMinMembers(this.MinMembers)
+                    .SetMaxMembers(this.MaxMembers)
+                    .SetMaxInvitations(this.MaxInvitations)
+                    .SetPrivacyLevel(this.PrivacyLevel)
+                    .Build();
+            }
+        }
+
+        // Description
+        public bnet.protocol.channel.ChannelDescription Description
+        {
+            get
+            {
+                // NOTE: Can have extensions
+                var builder = bnet.protocol.channel.ChannelDescription.CreateBuilder()
+                    .SetChannelId(this.BnetEntityId)
+                    .SetState(this.State);
+                if (this.Members.Count > 0) // No reason to set a value that defaults to 0
+                    builder.SetCurrentMembers((uint)this.Members.Count);
+                return builder.Build();
+            }
+        }
+
+        // Info
+        public bnet.protocol.channel.ChannelInfo Info
+        {
+            get
+            {
+                // NOTE: Can have extensions
+                var builder = bnet.protocol.channel.ChannelInfo.CreateBuilder()
+                    .SetDescription(this.Description);
+                foreach (var pair in this.Members)
+                {
+                    builder.AddMember(pair.Value.BnetMember);
+                }
+                return builder.Build();
+            }
+        }
+
+        public readonly Dictionary<BNetClient, Member> Members = new Dictionary<BNetClient, Member>();
+        public BNetClient Owner { get; private set; }
+
+        public Channel(BNetClient client, ulong remoteObjectId)
+        {
+            this.BnetEntityId = bnet.protocol.EntityId.CreateBuilder().SetHigh((ulong)EntityIdHelper.HighIdType.ChannelId).SetLow(this.DynamicId).Build();
+            this.D3EntityId = D3.OnlineService.EntityId.CreateBuilder().SetIdHigh((ulong)EntityIdHelper.HighIdType.ChannelId).SetIdLow(this.DynamicId).Build();
+            this.PrivacyLevel = bnet.protocol.channel.ChannelState.Types.PrivacyLevel.PRIVACY_LEVEL_OPEN_INVITATION;
+            this.MinMembers = 1;
+            this.MaxMembers = 8;
+            this.MaxInvitations = 12;
+
+            // This is an object creator, so we have to map the remote object ID
+            client.MapLocalObjectID(this.DynamicId, remoteObjectId);
+
+            // The client can't be set as the owner (or added as a member) here because the server must first make a response
+            // to the client before using a mapped ID (presuming that this was called from a service).
+            // We'll just let the caller do that for us.
+        }
+
+        public void SetOwner(BNetClient client)
+        {
+            if (client == this.Owner)
+            {
+                Logger.Warn("Tried to set client {0} as owner of channel when it was already the owner", client.Connection.RemoteEndPoint.ToString());
+                return;
+            }
+            // TODO: Should send state update to current owner instead of removing it
+            RemoveOwner(RemoveReason.Left);
+            this.Owner = client;
+            AddMember(client);
+        }
+
+        public void RemoveOwner(RemoveReason reason)
+        {
+            if (this.Owner != null)
+            {
+                RemoveMember(this.Owner, reason, false);
+                this.Owner = null;
+            }
+        }
+
+        public Member GetMember(BNetClient client)
+        {
+            return this.Members[client];
         }
 
         public void AddMember(BNetClient client)
         {
+            if (HasUser(client))
+            {
+                Logger.Warn("Attempted to add client {0} to channel when it was already a member of the channel", client.Connection.RemoteEndPoint.ToString());
+                return;
+            }
+
             var identity = client.GetIdentity(false, false, true);
-            var member = bnet.protocol.channel.Member.CreateBuilder()
-                .SetIdentity(identity)
-                .SetState(bnet.protocol.channel.MemberState.CreateBuilder()
-                    .AddRole(2)
-                    .SetPrivileges(0xFBFF) // 64511
-                    .Build())
-                .Build();
 
-            // be carefult when editing the below rpc call, you may broke in game to error!! /raist.
-            var builder = bnet.protocol.channel.AddNotification.CreateBuilder()
-                .SetChannelState(this.State)
-                .SetSelf(member);
-            client.CallMethod(bnet.protocol.channel.ChannelSubscriber.Descriptor.FindMethodByName("NotifyAdd"), builder.Build(), this.DynamicId);
+            bool isOwner = client == this.Owner;
+            var addedMember = new Member(identity,
+                (isOwner) ? Member.Privilege.UnkCreator : Member.Privilege.UnkMember);
 
-            this.Members.Add(client, member);
+            if (this.Members.Count > 0)
+            {
+                addedMember.AddRoles(
+                    (isOwner) ? Member.Role.PartyLeader : Member.Role.PartyMember,
+                    Member.Role.ChannelMember);
+            }
+            else
+            {
+                addedMember.AddRole((isOwner) ? Member.Role.ChannelCreator : Member.Role.ChannelMember);
+            }
+
+            // This needs to be here so that the foreach below will also send to the client that was just added
+            this.Members.Add(client, addedMember);
+
+            // Cache the built state and member
+            var channelState = this.State;
+            var bnetMember = addedMember.BnetMember;
+
+            var method = bnet.protocol.channel.ChannelSubscriber.Descriptor.FindMethodByName("NotifyAdd");
+            foreach (var pair in this.Members)
+            {
+                var message = bnet.protocol.channel.AddNotification.CreateBuilder()
+                    .SetChannelState(channelState)
+                    // Set the Self property for each call on each client
+                    // TODO: This may not be necessary here (this field is optional); check the caps
+                    .SetSelf(pair.Value.BnetMember)
+                    .AddMember(bnetMember)
+                    .Build();
+                //Logger.Warn("NotifyAdd:\n{0}", message.ToString());
+                pair.Key.CallMethod(method, message, this.DynamicId);
+            }
+            client.CurrentChannel = this;
         }
 
-        /*public void NotifyJoin(BNetClient client)
+        public void Dissolve()
         {
-            var notification = bnet.protocol.channel.JoinNotification.CreateBuilder().SetMember(this.Members[client]).Build();
+            ChannelManager.DissolveChannel(this.DynamicId);
+        }
 
-            foreach(var pair in Members)
+        public void RemoveAllMembers(bool dissolving)
+        {
+            if (!dissolving)
             {
-                if (pair.Key == client) continue;
-
-                pair.Key.CallMethod(bnet.protocol.channel.ChannelSubscriber.Descriptor.FindMethodByName("NotifyJoin"), notification, this.DynamicId);
+                Dissolve();
+                return;
             }
-        }    */
+            foreach (var pair in this.Members)
+            {
+                // TODO: There should probably be a RemoveReason for "channel dissolved"; find it!
+                RemoveMember(pair.Key, RemoveReason.Left, true);
+            }
+        }
+
+        public void RemoveMemberByID(bnet.protocol.EntityId memberId, RemoveReason reason)
+        {
+            var client = this.Members.FirstOrDefault(pair => pair.Value.Identity.ToonId == memberId).Key;
+            RemoveMember(client, reason, false);
+        }
+
+        public void RemoveMember(BNetClient client, RemoveReason reason)
+        {
+            RemoveMember(client, reason, false);
+        }
+
+        public void RemoveMember(BNetClient client, RemoveReason reason, bool dissolving)
+        {
+            if (client.CurrentToon == null)
+            {
+                Logger.Warn("Could not remove toon-less client {0}", client.Connection.RemoteEndPoint.ToString());
+                return;
+            }
+            else if (!HasUser(client))
+            {
+                Logger.Warn("Attempted to remove non-member client {0} from channel", client.Connection.RemoteEndPoint.ToString());
+                return;
+            }
+            else if (client.CurrentChannel != this)
+            {
+                Logger.Warn("Client {0} is being removed from a channel that is not its current one..", client.Connection.RemoteEndPoint.ToString());
+            }
+            var memberId = this.Members[client].Identity.ToonId;
+            var message = bnet.protocol.channel.RemoveNotification.CreateBuilder()
+                .SetMemberId(memberId)
+                .SetReason((uint)reason)
+                .Build();
+            //Logger.Debug("NotifyRemove message:\n{0}", message.ToString());
+            var method = bnet.protocol.channel.ChannelSubscriber.Descriptor.FindMethodByName("NotifyRemove");
+            foreach (var pair in this.Members)
+            {
+                pair.Key.CallMethod(method, message, this.DynamicId);
+            }
+            this.Members.Remove(client);
+            client.CurrentChannel = null;
+            if (client == this.Owner)
+                this.Owner = null;
+
+            if (this.Members.Count == 0 && !dissolving)
+                Dissolve();
+        }
 
         public bool HasUser(BNetClient client)
         {
             return this.Members.Any(pair => pair.Key == client);
         }
-
-        public void RemoveUser(BNetClient client)
-        {
-            //// send notification remove to client itself.
-            //var identity = client.GetIdentity(false, false, true);
-            //var builder = bnet.protocol.channel.RemoveNotification.CreateBuilder()
-            //    .SetMemberId(identity.ToonId);
-
-            //this.Members.Remove(client);
-            //client.CallMethod(bnet.protocol.channel.ChannelSubscriber.Descriptor.FindMethodByName("NotifyRemove"), builder.Build(), this.DynamicId);
-
-            //// notify all subscribers.
-            //this.NotifySubscribers();
-        }
-
-        /*public void Close()
-        {
-            RemoveAllUsers();
-        }
-        
-        public void RemoveAllUsers()
-        {
-            // Need a way to iterate clients on the server to send a NotifyRemove
-            // and then call RemoveUser on them
-            this.Members.Clear();
-        }*/
-
-        //public void NotifyChannelState(BNetClient client)
-        //{
-        //    var field1 =
-        //        bnet.protocol.presence.Field.CreateBuilder().SetKey(
-        //            bnet.protocol.presence.FieldKey.CreateBuilder().SetProgram(16974).SetGroup(3).SetField(3).SetIndex(0)
-        //                .Build()).SetValue(bnet.protocol.attribute.Variant.CreateBuilder().SetBoolValue(true).Build()).Build();
-
-        //    var field2 =
-        //        bnet.protocol.presence.Field.CreateBuilder().SetKey(
-        //            bnet.protocol.presence.FieldKey.CreateBuilder().SetProgram(16974).SetGroup(3).SetField(10).SetIndex(0)
-        //                .Build()).SetValue(bnet.protocol.attribute.Variant.CreateBuilder().SetIntValue(1315530390868296).Build()).Build();
-
-        //    var field3 =
-        //        bnet.protocol.presence.Field.CreateBuilder().SetKey(
-        //            bnet.protocol.presence.FieldKey.CreateBuilder().SetProgram(16974).SetGroup(3).SetField(11).SetIndex(0)
-        //                .Build()).SetValue(bnet.protocol.attribute.Variant.CreateBuilder().SetMessageValue(
-        //                        ByteString.CopyFrom(new byte[]
-        //                                                {
-        //                                                    0x9, 0x46, 0xee, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4,
-        //                                                    0x11, 0xdd, 0xb4, 0x63, 0xe7, 0x82, 0x44, 0x68, 0x4e
-        //                                                })).Build()).Build();
-
-
-        //    var fieldOperation1 = bnet.protocol.presence.FieldOperation.CreateBuilder().SetField(field1).Build();
-        //    var fieldOperation2 = bnet.protocol.presence.FieldOperation.CreateBuilder().SetField(field2).Build();
-        //    var fieldOperation3 = bnet.protocol.presence.FieldOperation.CreateBuilder().SetField(field3).Build();
-
-        //    var state =
-        //        bnet.protocol.presence.ChannelState.CreateBuilder().SetEntityId(this.BnetEntityID).AddFieldOperation(
-        //            fieldOperation1).AddFieldOperation(fieldOperation2).AddFieldOperation(fieldOperation3).Build();
-
-
-        //    var channelState = bnet.protocol.channel.ChannelState.CreateBuilder().SetExtension(bnet.protocol.presence.ChannelState.Presence, state);
-        //    var builder = bnet.protocol.channel.UpdateChannelStateNotification.CreateBuilder().SetStateChange(channelState);
-
-        //    client.CallMethod(bnet.protocol.channel.ChannelSubscriber.Descriptor.FindMethodByName("NotifyUpdateChannelState"), builder.Build(), this.DynamicId);
-        //}
     }
 }

@@ -18,6 +18,7 @@
 
 using System;
 using D3Sharp.Core.Channels;
+using D3Sharp.Core.Toons;
 using D3Sharp.Net.BNet;
 using D3Sharp.Utils;
 using Google.ProtocolBuffers;
@@ -31,21 +32,21 @@ namespace D3Sharp.Core.Services
         private static readonly Logger Logger = LogManager.CreateLogger();
         public IBNetClient Client { get; set; }
 
-        // PartyService just used ChannelService to create a new channel for the party.
-
+        // PartyService just uses ChannelService to create a new channel for the party.
         public override void CreateChannel(IRpcController controller, CreateChannelRequest request, Action<CreateChannelResponse> done)
         {
             Logger.Trace("CreateChannel()");
-            
-            var channel = ChannelsManager.CreateNewChannel((BNetClient)this.Client);
-
-            // This is an object creator, so we have to map the remote object ID
-            this.Client.MapLocalObjectID(channel.DynamicId, request.ObjectId);
+            var channel = ChannelManager.CreateNewChannel((BNetClient)this.Client, request.ObjectId);
             var builder = CreateChannelResponse.CreateBuilder()
                 .SetObjectId(channel.DynamicId)
-                .SetChannelId(channel.BnetEntityID);
+                .SetChannelId(channel.BnetEntityId);
 
             done(builder.Build());
+
+            // Set the client that requested the creation of channel as the owner
+            channel.SetOwner((BNetClient)Client);
+
+            Logger.Warn("Created a new channel {0}:{1} for toon {2}", channel.BnetEntityId.High, channel.BnetEntityId.Low, Client.CurrentToon.Name);
         }
 
         public override void JoinChannel(IRpcController controller, JoinChannelRequest request, Action<JoinChannelResponse> done)
@@ -55,7 +56,17 @@ namespace D3Sharp.Core.Services
 
         public override void GetChannelInfo(IRpcController controller, GetChannelInfoRequest request, Action<GetChannelInfoResponse> done)
         {
-            throw new NotImplementedException();
+            Logger.Trace("GetChannelInfoRequest()");
+            Logger.Warn("Request to channel {0}:{1} by toon {2}", request.ChannelId.High, request.ChannelId.Low, Client.CurrentToon.Name);
+
+            var builder = bnet.protocol.channel.GetChannelInfoResponse.CreateBuilder();
+            var channel = ChannelManager.GetChannelByEntityId(request.ChannelId);
+            if (channel != null)
+                builder.SetChannelInfo(channel.Info);
+            else
+                Logger.Warn("Channel does not exist!");
+
+            done(builder.Build());
         }
     }
 }

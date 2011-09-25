@@ -18,7 +18,7 @@
 
 namespace D3Sharp.Net.Game
 {
-    public sealed class GameServer:Server
+    public sealed class GameServer : Server
     {
         public GameServer()
         {
@@ -30,8 +30,8 @@ namespace D3Sharp.Net.Game
 
         void GameServer_DataReceived(object sender, ConnectionDataEventArgs e)
         {
-            var connection = (Connection) e.Connection;
-            ((GameClient) connection.Client).Parse(e);
+            var connection = (Connection)e.Connection;
+            ((GameClient)connection.Client).Parse(e);
         }
 
         void GameServer_OnConnect(object sender, ConnectionEventArgs e)

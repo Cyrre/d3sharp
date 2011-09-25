@@ -24,6 +24,7 @@ using D3Sharp.Core.Helpers;
 using D3Sharp.Core.Objects;
 using D3Sharp.Core.Storage;
 using D3Sharp.Core.Toons;
+using D3Sharp.Net.BNet;
 using D3Sharp.Utils;
 using D3Sharp.Utils.Helpers;
 
@@ -31,13 +32,12 @@ namespace D3Sharp.Core.Accounts
 {
     public class Account : PersistentRPCObject
     {
-        private static readonly Logger Logger = LogManager.CreateLogger();
-
         public bnet.protocol.EntityId BnetAccountID { get; private set; }
         public bnet.protocol.EntityId BnetGameAccountID { get; private set; }
         public D3.Account.BannerConfiguration BannerConfiguration { get; private set; }
-
         public string Email { get; private set; }
+
+        public BNetClient LoggedInClient { get; set; }
 
         public D3.Account.Digest Digest
         {
@@ -47,10 +47,11 @@ namespace D3Sharp.Core.Accounts
                     .SetBannerConfiguration(this.BannerConfiguration)
                     .SetFlags(0);
 
-                builder.SetLastPlayedHeroId(Toons.Count > 0
-                                                ? Toons.First().Value.D3EntityID
-                                                : D3.OnlineService.EntityId.CreateBuilder().SetIdHigh(0).SetIdLow(0).
-                                                      Build());
+                builder.SetLastPlayedHeroId(
+                    (Toons.Count > 0)
+                    ? Toons.First().Value.D3EntityID
+                    : D3.OnlineService.EntityId.CreateBuilder().SetIdHigh(0).SetIdLow(0)
+                    .Build());
                 return builder.Build();
             }
         }
@@ -101,11 +102,12 @@ namespace D3Sharp.Core.Accounts
 
         protected override void NotifySubscriptionAdded(Net.BNet.BNetClient client)
         {
-            // Check d3sharp/docs/rpc/notification-data-layout.txt for fields keys
+            // Check docs/rpc/fields.txt for fields keys
 
             // RealID name field
+            // NOTE: Probably won't ever use this for its actual purpose, but showing the email in final might not be a good idea
             var fieldKey1 = FieldKeyHelper.Create(FieldKeyHelper.Program.BNet,1, 1, 0);
-            var field1 = bnet.protocol.presence.Field.CreateBuilder().SetKey(fieldKey1).SetValue(bnet.protocol.attribute.Variant.CreateBuilder().SetStringValue("RealID Name here!").Build()).Build();
+            var field1 = bnet.protocol.presence.Field.CreateBuilder().SetKey(fieldKey1).SetValue(bnet.protocol.attribute.Variant.CreateBuilder().SetStringValue(this.Email).Build()).Build();
             var fieldOperation1 = bnet.protocol.presence.FieldOperation.CreateBuilder().SetField(field1).Build();
 
             // Hardcoded boolean - always true

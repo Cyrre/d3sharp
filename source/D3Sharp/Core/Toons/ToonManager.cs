@@ -38,6 +38,11 @@ namespace D3Sharp.Core.Toons
             LoadToons();
         }
 
+        public static Account GetAccountByToonLowID(ulong id)
+        {
+            return (from pair in Toons where pair.Value.PersistentID == id select pair.Value).FirstOrDefault().Owner;
+        }
+
         public static Toon GetToonByLowID(ulong id)
         {
             return (from pair in Toons where pair.Value.PersistentID == id select pair.Value).FirstOrDefault();
@@ -45,7 +50,7 @@ namespace D3Sharp.Core.Toons
 
         public static Dictionary<ulong, Toon> GetToonsForAccount(Account account)
         {
-            return Toons.Where(pair => (ulong)pair.Value.AccountID == account.PersistentID).ToDictionary(pair => pair.Key, pair => pair.Value);
+            return Toons.Where(pair => (ulong)pair.Value.Owner.PersistentID == account.PersistentID).ToDictionary(pair => pair.Key, pair => pair.Value);
         }
 
         public static bool SaveToon(Toon toon)

@@ -16,28 +16,24 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-using System.Collections.Generic;
-using System.Linq;
-using D3Sharp.Core.Objects;
-using D3Sharp.Net.BNet;
+using System;
+using Google.ProtocolBuffers;
+using bnet.protocol;
+using bnet.protocol.authentication;
 
-namespace D3Sharp.Core.Channels
+namespace BNet2ProtoExtractor.Services
 {
-    public static class ChannelsManager
+    [Service(serviceID: 0x1, serviceName: "bnet.protocol.authentication.AuthenticationServer")]
+    public class AuthenticationService:AuthenticationServer
     {
-        public readonly static Dictionary<ulong, Channel> Channels =
-            new Dictionary<ulong, Channel>();
-
-        public static Channel CreateNewChannel(BNetClient client)
+        public override void Logon(IRpcController controller, LogonRequest request, Action<LogonResponse> done)
         {
-            var channel = new Channel(client);
-            Channels.Add(channel.DynamicId, channel);
-            return channel;
+            ProtoOutputBuffer.Write(request.GetType(), request.ToString());
         }
 
-        public static Channel DeleteChannel(ulong id) {
-            throw new System.NotImplementedException();
-            // TODO: Mapping removal should be done in client or mayhaps the ID controller
+        public override void ModuleMessage(IRpcController controller, ModuleMessageRequest request, Action<NoData> done)
+        {
+            ProtoOutputBuffer.Write(request.GetType(), request.ToString());
         }
     }
 }
