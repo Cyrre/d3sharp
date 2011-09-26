@@ -26,26 +26,22 @@ namespace D3Sharp.Core.Actors
 
         public static bool isBlackListed(int id)
         {
-            for (int x = 0; x < BlackList.Length; x++)
-                if (BlackList[x] == id) return true;
-              
-            return false;
+            return inList(id, BlackList);
         }
 
         public static bool isNPC(int id)
         {
-            for (int x = 0; x < NPCList.Length; x++)
-                if (NPCList[x] == id) return true;
-
-            return false;
+            return inList(id, NPCList);
         }
         
         public static bool isMob(int id)
         {
-            for (int x = 0; x < NPCList.Length; x++)
-                if (MobList[x] == id) return true;
+            return inList(id, MobList);
+        }
 
-            return false;
+        public static bool inList(int id, int[] list)
+        {
+            return Array.BinarySearch(list, id) > -1;
         }
 
         public static void Init()
