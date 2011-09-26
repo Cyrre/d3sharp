@@ -648,6 +648,276 @@ namespace D3Sharp.Net.Game
     },
             });
 
+            int[] skills = new int[0];
+            switch (BnetClient.CurrentToon.Class)
+            {
+                case Core.Toons.ToonClass.Barbarian: skills = (int[])Enum.GetValues(typeof(Skills.Barbarian)); break;
+                case Core.Toons.ToonClass.DemonHunter: skills = (int[])Enum.GetValues(typeof(Skills.DemonHunter)); break;
+                case Core.Toons.ToonClass.Monk: skills = (int[])Enum.GetValues(typeof(Skills.Monk)); break;
+                case Core.Toons.ToonClass.WitchDoctor: skills = (int[])Enum.GetValues(typeof(Skills.WitchDoctor)); break;
+                case Core.Toons.ToonClass.Wizard: skills = (int[])Enum.GetValues(typeof(Skills.Wizard)); break;
+            }
+
+            foreach (int val in skills)
+            {
+                SendMessage(new AttributesSetValuesMessage()
+                                {
+                                    Id = 0x004D,
+                                    Field0 = 0x789E00E2,
+                                    atKeyVals = new NetAttributeKeyValue[]
+                                                    {
+                                                        new NetAttributeKeyValue()
+                                                            {
+                                                                Field0 = val,
+                                                                Attribute = GameAttribute.Attributes[0x0041], // Skill
+                                                                Int = 0x00000001,
+                                                                Float = 0f,
+                                                            },
+                                                        new NetAttributeKeyValue()
+                                                            {
+                                                                Field0 = val,
+                                                                Attribute = GameAttribute.Attributes[0x0042], // Skill_Total
+                                                                Int = 0x00000001,
+                                                                Float = 0f,
+                                                            }
+                                                    }
+                                });
+            }
+
+            // Head
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000001,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[0].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+            // Chest
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000002,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[1].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+            // Feet
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000007,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[2].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+
+            // Hands
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000005,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[3].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+            // Weapon 1
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000004,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[4].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+            // Weapon 2
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000003,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[5].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+            // Shoulders
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000008,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[6].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+            // Legs
+            SendMessage(new ACDEnterKnownMessage()
+            {
+                Id = 0x003B,
+                Field0 = 0x789F00E3,
+                Field1 = 0x00001025,
+                Field2 = 0x0000001A,
+                Field3 = 0x00000001,
+                Field4 = null,
+                Field5 = new InventoryLocationMessageData()
+                {
+                    Field0 = 0x789E00E2,
+                    Field1 = 0x00000000,
+                    Field2 = new IVector2D()
+                    {
+                        Field0 = 0x00000000,
+                        Field1 = 0x00000000,
+                    },
+                },
+                Field6 = new GBHandle()
+                {
+                    Field0 = 0x00000002,
+                    Field1 = BnetClient.CurrentToon.Equipment.VisualItemList[7].Gbid,
+                },
+                Field7 = -1,
+                Field8 = -1,
+                Field9 = 0x00000001,
+                Field10 = 0x00,
+            });
+
             SendMessage(new AttributesSetValuesMessage()
             {
                 Id = 0x004D,
