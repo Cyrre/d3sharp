@@ -8160,7 +8160,6 @@ namespace D3Sharp.Net.Game
                     position.Field0 -= (float)(rand.NextDouble() * 20);
                     position.Field1 -= (float)(rand.NextDouble() * 20);
                 }
-                System.Threading.Thread.Sleep(15); // Required to not generate the same random value twice...
                 SpawnMob(BasicNPC.RandomNPC());
             }
 

@@ -726,11 +726,11 @@ namespace D3Sharp.Core.NPC
             Zombie_E = 204256, //Rancid Stumbler
         }
 
+        private static Random Random = new Random();
         public static int RandomNPC()
         {
-            Random r = new Random();
             NPCList[] values = (NPCList[])Enum.GetValues(typeof(NPCList));
-            int toReturn = (int)values[r.Next(0, values.Length)];
+            int toReturn = (int)values[Random.Next(0, values.Length)];
             return toReturn;
         }
     }
